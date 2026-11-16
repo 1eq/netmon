@@ -4,7 +4,7 @@ import Foundation
 ///
 ///     netmon status
 ///     netmon path [target]
-///     netmon history [target] [range]       range: 15m | 1h | 24h | 7d
+///     netmon history [target] [range] [points]   range: 15m | 1h | 24h | 7d
 ///     netmon events [limit]
 ///     netmon throughput [limit]
 ///     netmon speedtest [--no-wait]
@@ -57,7 +57,9 @@ enum CLI {
         case "history":
             var out: [String: Any] = [:]
             for arg in rest {
-                if Tools.rangeValues.contains(arg) { out["range"] = arg } else { out["target"] = arg }
+                if Tools.rangeValues.contains(arg) { out["range"] = arg }
+                else if let n = Int(arg) { out["points"] = n }
+                else { out["target"] = arg }
             }
             return out
         case "events", "throughput":
@@ -96,7 +98,7 @@ enum CLI {
 
           netmon status                      health, latency, loss, findings, last speed test
           netmon path [target]               mtr-style hop table + diagnosis
-          netmon history [target] [range]    range: \(Tools.rangeValues.joined(separator: " | "))
+          netmon history [target] [range] [points]  range: \(Tools.rangeValues.joined(separator: " | "))
           netmon events [limit]              alerts, recoveries, speed tests
           netmon throughput [limit]          speed test history
           netmon speedtest [--no-wait]       run networkQuality (uses hundreds of MB)

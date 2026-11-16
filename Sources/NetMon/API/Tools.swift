@@ -32,13 +32,14 @@ enum Tools {
              run: { args in try await APIClient.get("/path", query: stringArgs(args, ["target"])) }),
 
         Tool(name: "netmon_history", cliName: "history",
-             description: "Latency and loss over time for a target, bucketed for charting, plus a summary for the range. 15m and 1h come from raw per-second samples; 24h and 7d from stored per-minute rollups. Use to answer \"was my connection bad earlier/last night?\".",
+             description: "Latency and loss over time for a target: a summary for the range, worstPeriods (the 3 worst buckets by average latency, by loss and by single-probe spike, with timestamps, at the range's finest resolution), and up to `points` buckets for the trend. 15m and 1h come from raw per-second samples; 24h and 7d from stored per-minute rollups. Use to answer \"was my connection bad earlier/last night, and when?\". Pass a target to keep the response small.",
              properties: [
                  "target": ["type": "string", "description": "Monitored host. Omit for all targets."],
                  "range": ["type": "string", "enum": rangeValues, "description": "Time window (default 1h)."],
+                 "points": ["type": "integer", "description": "Max trend buckets per target (10-500, default 60)."],
              ],
              required: [], readOnly: true,
-             run: { args in try await APIClient.get("/history", query: stringArgs(args, ["target", "range"])) }),
+             run: { args in try await APIClient.get("/history", query: stringArgs(args, ["target", "range", "points"])) }),
 
         Tool(name: "netmon_events", cliName: "events",
              description: "Event log, newest first: connection down/restored, degraded latency/loss/jitter, bad-hop findings, speed test results and failures. Persisted across restarts.",

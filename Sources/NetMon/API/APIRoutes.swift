@@ -98,6 +98,13 @@ struct HistoryPointDTO: Encodable {
     let avgMs: Double?
     let maxMs: Double?
     let lossPercent: Double
+
+    init(_ p: ChartPoint) {
+        t = p.t
+        avgMs = r1(p.avg)
+        maxMs = r1(p.max)
+        lossPercent = r1(p.lossPercent) ?? 0
+    }
 }
 
 struct HistoryDTO: Encodable {
@@ -105,7 +112,16 @@ struct HistoryDTO: Encodable {
     let range: String
     let bucketSeconds: Int
     let summary: StatsDTO
+    /// The worst buckets at the range's finest resolution, so "when was it bad?" needs no scan.
+    let worstPeriods: WorstPeriodsDTO
     let points: [HistoryPointDTO]
+}
+
+struct WorstPeriodsDTO: Encodable {
+    let bucketSeconds: Int
+    let highestAvgLatency: [HistoryPointDTO]
+    let highestLoss: [HistoryPointDTO]
+    let biggestSpikes: [HistoryPointDTO]
 }
 
 struct TraceDTO: Encodable {
@@ -147,12 +163,22 @@ enum APIRoutes {
             }
             let monitors = select(model, req.query["target"])
             guard !monitors.isEmpty else { return .error(404, unknownTarget(model, req.query["target"])) }
+            // Keep responses small enough for an MCP client: coarsen buckets to at most `points`.
+            let maxPoints = min(500, max(10, Int(req.query["points"] ?? "") ?? 60))
+            let bucket = max(range.bucket, (range.seconds / Double(maxPoints)).rounded(.up))
             return .json(monitors.map { m in
-                HistoryDTO(target: m.host, range: range.rawValue, bucketSeconds: Int(range.bucket),
-                           summary: StatsDTO(model.rangeStats(for: m, range: range)),
-                           points: model.chartPoints(for: m, range: range).map {
-                               HistoryPointDTO(t: $0.t, avgMs: r1($0.avg), maxMs: r1($0.max), lossPercent: r1($0.lossPercent) ?? 0)
-                           })
+                let fine = model.chartPoints(for: m, range: range)
+                let coarse = bucket == range.bucket ? fine : model.chartPoints(for: m, range: range, bucket: bucket)
+                func top(_ value: (ChartPoint) -> Double?) -> [HistoryPointDTO] {
+                    fine.filter { (value($0) ?? 0) > 0 }.sorted { value($0) ?? 0 > value($1) ?? 0 }.prefix(3).map(HistoryPointDTO.init)
+                }
+                return HistoryDTO(target: m.host, range: range.rawValue, bucketSeconds: Int(bucket),
+                                  summary: StatsDTO(model.rangeStats(for: m, range: range)),
+                                  worstPeriods: WorstPeriodsDTO(bucketSeconds: Int(range.bucket),
+                                                                highestAvgLatency: top(\.avg),
+                                                                highestLoss: top(\.lossPercent),
+                                                                biggestSpikes: top(\.max)),
+                                  points: coarse.map(HistoryPointDTO.init))
             })
 
         case ("GET", "/events"):

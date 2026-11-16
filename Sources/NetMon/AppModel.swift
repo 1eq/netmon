@@ -160,13 +160,15 @@ final class AppModel {
         monitors.compactMap { $0.stats(lastSeconds: 10).avg }.min()
     }
 
-    func chartPoints(for monitor: TargetMonitor, range: TimeRange) -> [ChartPoint] {
+    /// Chart points for `range`, in the range's own bucket size unless `bucket` overrides it.
+    func chartPoints(for monitor: TargetMonitor, range: TimeRange, bucket: TimeInterval? = nil) -> [ChartPoint] {
         let cutoff = Date().addingTimeInterval(-range.seconds)
+        let size = bucket ?? range.bucket
         if range.usesRawSamples {
-            return Bucketing.fromSamples(monitor.samples.filter { $0.t >= cutoff }, target: monitor.host, bucket: range.bucket)
+            return Bucketing.fromSamples(monitor.samples.filter { $0.t >= cutoff }, target: monitor.host, bucket: size)
         }
         return Bucketing.fromRollups(rollups.filter { $0.target == monitor.host && $0.start >= cutoff },
-                                     target: monitor.host, bucket: range.bucket)
+                                     target: monitor.host, bucket: size)
     }
 
     func rangeStats(for monitor: TargetMonitor, range: TimeRange) -> ProbeStats {

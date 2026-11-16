@@ -289,7 +289,7 @@ When Claude connects, the server sends it instructions on reading the data: the 
 |---|---|---|---|
 | `netmon_status` | `netmon status` | Yes | Health, 60 s and 5 min stats, important findings, VPN, last speed test, recent events, thresholds, whether IPv6 is available. Each target says its `ipVersion`; twins say which target they mirror (`twinOf`). The starting point |
 | `netmon_path` | `netmon path [target]` | Yes | The hop table and findings |
-| `netmon_history` | `netmon history [target] [15m\|1h\|24h\|7d]` | Yes | Bucketed latency and loss, with a summary for the range |
+| `netmon_history` | `netmon history [target] [15m\|1h\|24h\|7d] [points]` | Yes | A summary for the range, the worst periods (3 worst buckets each by average latency, loss and spike, with times), and up to 60 trend buckets (`points` changes it) |
 | `netmon_events` | `netmon events [limit]` | Yes | Event log, newest first; MCP can also filter by minutes |
 | `netmon_throughput_history` | `netmon throughput [limit]` | Yes | Past speed tests |
 | `netmon_trace` | `netmon trace <host> [cycles]` | Yes | One-off trace and diagnosis to any host |
@@ -313,7 +313,7 @@ All requests need `Authorization: Bearer <token>`, using the token from `api.jso
 |---|---|
 | `GET /status` | |
 | `GET /path` | `target` |
-| `GET /history` | `target`, `range` |
+| `GET /history` | `target`, `range`, `points` |
 | `GET /events` | `limit`, `since_minutes` |
 | `GET /throughput` | `limit` |
 | `GET /settings` | |
