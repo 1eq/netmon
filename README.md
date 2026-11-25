@@ -4,25 +4,48 @@
 
 # NetMon
 
-A small native macOS menu bar app that monitors your internet connection.
+**Your speed test looks fine. Your calls don't.**
 
-- **Latency** to 1.1.1.1 and 8.8.8.8 (configurable), pinged once a second: last, avg, min, max, loss, jitter.
-- **IPv6**: while your Mac has IPv6, every target gets an IPv6 twin on the same network, so IPv6-only problems show up.
-- **mtr-style path analysis**: every hop is probed continuously and kept as a rolling window of 100 probes. The app then works out which hop is actually at fault (see below).
-- **Wi-Fi analyzer**: signal, noise, SNR, link rate, channel/band/width and roaming every 2 s; periodic scans of nearby access points with a channel map, per-channel load scores, access point load (BSS Load) when broadcast, and a channel suggestion. It also tells you whether Wi-Fi explains a slow first hop.
-- **Throughput** via macOS's built-in `networkQuality`: download, upload, responsiveness (RPM) and idle RTT.
-- **History & charts**: 15m / 1h from raw samples, 24h / 7d from per-minute rollups kept on disk.
-- **Notifications** for connection down/restored, sustained loss, latency or jitter, bad hops, and slow downloads.
+NetMon watches your connection from your Mac's menu bar, tracks latency and packet loss, and helps you investigate where problems start. When a call freezes, a game lags, or your work VPN feels slow, you have connection history to inspect—even after things recover.
 
-For how everything works in detail (measurement, diagnosis rules, alerts, data files, the API and the source layout), see **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)**. The same guide is in the app under **Guide**.
+**Native Mac app. Free and open source. No account required.**
 
-No root, no dependencies. Probes use an unprivileged ICMP datagram socket, which macOS allows for normal users. It still receives the TTL-exceeded replies a hop trace needs.
+[Get NetMon](#get-netmon) · [See it in action](#screenshots) · [CLI and Claude integration](#using-it-from-claude-mcp--cli)
+
+## Understand your connection
+
+- **Catch problems a speed test can miss.** Watch response times, packet loss, and jitter—the variation in delay that can make calls and games unreliable.
+- **Look back after a dropout.** Explore latency and loss over 15 minutes, an hour, a day, or a week, with a record of connection alerts and recoveries.
+- **Investigate where trouble starts.** Follow the route to your destination, with explanations of problems that persist through later hops and router replies that are harmless. VPN context helps you understand what the app can see.
+- **Check your Wi-Fi.** Inspect signal quality, nearby networks, and channel congestion, with suggestions when a quieter channel is available.
+- **Keep an eye on things from the menu bar.** See connection health and current latency at a glance, then open the full window when you need more detail.
+- **Compare with a speed test.** Measure download, upload, and responsiveness with macOS's built-in test, and review previous results.
+
+## Get NetMon
+
+Requires **macOS 15 (Sequoia) or later on Apple Silicon**.
+
+**[Download a test build for Mac](https://github.com/1eq/netmon/releases)**
+
+Choose the app archive (`NetMon-<version>.zip`) and follow that release's installation instructions. The currently published builds are pre-releases and are **not notarized**. They predate the Wi-Fi analyzer and the screenshots below; [build from source](#development) for the latest features.
+
+## Getting started
+
+1. Open NetMon and look for the coloured dot and latency in your menu bar.
+2. Click it for a quick summary, or choose **Open NetMon** for charts and diagnostics.
+3. Leave it running so it can capture intermittent problems. When something feels slow, check **Overview**, then **Path** and **Wi-Fi** for clues.
+
+To start it automatically, turn on **Launch at login** in Settings. You can also configure targets, alert thresholds, and history retention there.
+
+**Permissions:** notifications let NetMon tell you when connection conditions change. Location Services lets macOS reveal Wi-Fi network names and access point details; NetMon never reads or stores your location. Signal, channel, and congestion data work without it. You can manage both permissions in System Settings.
+
+For measurement details, diagnosis rules, alerts, and the API, see [How it works](docs/HOW-IT-WORKS.md). The same guide is available in the app under **Guide**.
 
 ## Screenshots
 
 ### Connection overview
 
-Live latency, packet loss, and recent connection events in one window.
+See when your connection became unreliable, with latency, packet loss, and recent events in one window.
 
 ![NetMon Overview with latency charts, target statistics, and recent events](docs/assets/overview.png)
 
@@ -34,42 +57,17 @@ Find where a problem carries forward through the route, with VPN context and har
 
 ### Throughput history
 
-Download, upload, responsiveness, and idle latency from macOS networkQuality.
+Compare download and upload speeds with responsiveness and idle latency over time.
 
 ![NetMon Throughput with speed test results and history](docs/assets/throughput.png)
-
-## Install
-
-Requires macOS 15 (Sequoia) or later on Apple Silicon.
-
-**Homebrew:**
-
-```bash
-brew install --cask 1eq/tap/netmon
-```
-
-This also puts the `netmon` CLI on your PATH.
-
-**Download:** get `NetMon-<version>.zip` from [Releases](https://github.com/1eq/netmon/releases), unzip it, and drag NetMon to Applications. Releases are signed and notarized.
-
-**From source** (needs Xcode 16+ or the Command Line Tools with Swift 6):
-
-```bash
-./scripts/build-app.sh            # builds build/NetMon.app
-./scripts/build-app.sh --install  # also copies to /Applications, links the CLI and launches it
-```
-
-Source builds are ad-hoc signed, so macOS may ask for Location permission again after each rebuild.
-
-It runs as a menu bar item showing a coloured dot (green/orange/red, blue during a speed test) and the current latency. Click it for a summary. **Open NetMon** opens the full window (Overview, Path, Wi-Fi, Throughput, Events, Settings, Guide). To start it automatically, turn on **Launch at login** in Settings.
-
-The first notification will ask for permission. If you miss it, allow NetMon in System Settings › Notifications.
-
-NetMon also asks for **Location Services** permission. macOS shows Wi-Fi network names, access point addresses and access point load only to apps with it. NetMon never reads or stores your location. Signal, channel and congestion data work without it. If you declined, turn it on in System Settings › Privacy & Security › Location Services.
 
 ## Wi-Fi
 
 The Wi-Fi screen samples the link every 2 s and scans for nearby access points every 10 minutes (configurable; 0 means only on demand). A scan takes the radio off your channel for 5–30 s, so it's kept infrequent, and alerts and hop stats pause for a minute after each one, as they do after a speed test. Each channel your router could use gets a score: roughly how many strong networks share or overlap its airtime. NetMon suggests a channel when one is clearly quieter; only the router can change it. NetMon can't see true airtime use, retry counts or the MCS index, because macOS doesn't expose them without monitor mode. See [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md#wi-fi-analysis) for the rules.
+
+## Latency and history
+
+NetMon pings configurable targets (1.1.1.1 and 8.8.8.8 by default) once a second, tracking last, average, minimum and maximum latency, loss, and jitter. When IPv6 is available, it also monitors an IPv6 target on the same network as each IPv4 target to help expose IPv6-only problems. The 15-minute and one-hour charts use raw samples; 24-hour and seven-day charts use per-minute history stored on disk.
 
 ## How bad hops are identified
 
@@ -102,6 +100,8 @@ While a test runs, and for a minute after, alerts and hop statistics pause, so t
 
 ## Using it from Claude (MCP + CLI)
 
+For developers and power users, NetMon also exposes its measurements through a JSON CLI and an MCP server. Query connection health from a terminal, or connect Claude Code to investigate using the app's live data.
+
 The app serves its live data on a loopback-only HTTP API (`127.0.0.1`, random port). The same `NetMon` binary works as an **MCP server** and a **JSON CLI** that talk to that API. Both launch the app if it isn't running.
 
 ```bash
@@ -131,6 +131,19 @@ claude mcp add --scope user netmon -- /Applications/NetMon.app/Contents/MacOS/Ne
 `~/Library/Application Support/NetMon/` holds JSON Lines files: `rollups.jsonl` (per-minute latency per target), `wifi.jsonl` (per-minute Wi-Fi signal, noise, link rate, channel), `throughput.jsonl`, `events.jsonl`. They're pruned to the history window in Settings (default 7 days).
 
 ## Development
+
+Needs Xcode 16+ or the Command Line Tools with Swift 6. NetMon has no external package dependencies and does not require root; its probes use unprivileged ICMP sockets.
+
+```bash
+git clone https://github.com/1eq/netmon.git
+cd netmon
+./scripts/build-app.sh            # builds build/NetMon.app
+./scripts/build-app.sh --install  # also installs, links the CLI and launches it
+```
+
+Source builds are ad-hoc signed, so macOS may ask for Location permission again after each rebuild.
+
+To build and run the tests:
 
 ```bash
 swift build && swift test
