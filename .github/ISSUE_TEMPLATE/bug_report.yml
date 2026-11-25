@@ -1,0 +1,44 @@
+name: Bug report
+description: Something NetMon does wrong or measures wrongly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Before pasting output, remove Wi-Fi network names and access point addresses (BSSIDs)**: they can reveal where you are. Security problems go through the Security tab, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    id: version
+    attributes:
+      label: NetMon version
+      description: The `version` field of `netmon status`.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac model
+      placeholder: macOS 15.3, MacBook Air M2
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      multiple: true
+      options: [Wi-Fi, Ethernet, VPN, Cellular hotspot]
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: "`netmon status`, plus `netmon path` for diagnosis problems or `netmon wifi` for Wi-Fi problems. If the app froze, attach `sample NetMon 5 -file netmon-sample.txt` taken while frozen."
+      render: json

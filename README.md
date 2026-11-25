@@ -16,14 +16,26 @@ No root, no dependencies. Probes use an unprivileged ICMP datagram socket, which
 
 ## Install
 
-Testing a build someone sent you? See [docs/TESTING.md](docs/TESTING.md). To make one: `scripts/package-test.sh` writes an app zip (with an installer) and a source zip to `dist/`.
+Requires macOS 15 (Sequoia) or later on Apple Silicon.
 
-Requires macOS 15+ and Xcode (or the Command Line Tools) with Swift 6.
+**Homebrew:**
+
+```bash
+brew install --cask 1eq/tap/netmon
+```
+
+This also puts the `netmon` CLI on your PATH.
+
+**Download:** get `NetMon-<version>.zip` from [Releases](https://github.com/1eq/netmon/releases), unzip it, and drag NetMon to Applications. Releases are signed and notarized.
+
+**From source** (needs Xcode 16+ or the Command Line Tools with Swift 6):
 
 ```bash
 ./scripts/build-app.sh            # builds build/NetMon.app
-./scripts/build-app.sh --install  # also copies to /Applications and launches it
+./scripts/build-app.sh --install  # also copies to /Applications, links the CLI and launches it
 ```
+
+Source builds are ad-hoc signed, so macOS may ask for Location permission again after each rebuild.
 
 It runs as a menu bar item showing a coloured dot (green/orange/red, blue during a speed test) and the current latency. Click it for a summary. **Open NetMon** opens the full window (Overview, Path, Wi-Fi, Throughput, Events, Settings, Guide). To start it automatically, turn on **Launch at login** in Settings.
 
@@ -100,4 +112,12 @@ claude mcp add --scope user netmon -- /Applications/NetMon.app/Contents/MacOS/Ne
 swift build && swift test
 ```
 
-`swift run` works for quick iteration, but notifications only work from the bundled `.app`.
+`swift run` works for quick iteration, but notifications and Location Services only work from the bundled `.app`. To share a test build with someone, `scripts/package-test.sh` writes an app zip (with an installer and [docs/TESTING.md](docs/TESTING.md)) and a source zip to `dist/`.
+
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately as described in [SECURITY.md](SECURITY.md). Maintainers: [docs/RELEASING.md](docs/RELEASING.md).
+
+## License
+
+[MIT](LICENSE)

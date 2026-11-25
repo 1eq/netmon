@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Builds NetMon.app (release, ad-hoc signed) into ./build, and with --install copies it
-# to /Applications (falling back to ~/Applications) and launches it.
+# Builds NetMon.app (release) into ./build, and with --install copies it to /Applications
+# (falling back to ~/Applications) and launches it.
+#   VERSION        version string for Info.plist (default 0.0.0-dev)
+#   SIGN_IDENTITY  codesigning identity, e.g. "Developer ID Application: …" (default "-", ad-hoc)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 APP="build/NetMon.app"
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-0.0.0-dev}"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 
 swift build -c release --arch arm64
 BIN="$(swift build -c release --arch arm64 --show-bin-path)/NetMon"
@@ -39,8 +42,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - "$APP"
-echo "Built $APP"
+if [[ "$SIGN_IDENTITY" == "-" ]]; then
+  codesign --force --sign - "$APP"
+else
+  # Notarization needs the hardened runtime and a secure timestamp. Under the hardened runtime,
+  # Location Services also needs its entitlement.
+  codesign --force --options runtime --timestamp --entitlements scripts/NetMon.entitlements \
+    --sign "$SIGN_IDENTITY" "$APP"
+fi
+codesign --verify --strict "$APP"
+echo "Built $APP (signed: $SIGN_IDENTITY)"
 
 if [[ "${1:-}" == "--install" ]]; then
   DEST="/Applications"
