@@ -18,6 +18,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/NetMon"
 # Rendered by the in-app Guide screen.
 cp docs/HOW-IT-WORKS.md "$APP/Contents/Resources/"
+cp Resources/NetMon.icns "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -28,6 +29,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleName</key><string>NetMon</string>
     <key>CFBundleDisplayName</key><string>NetMon</string>
     <key>CFBundleExecutable</key><string>NetMon</string>
+    <key>CFBundleIconFile</key><string>NetMon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
     <key>CFBundleVersion</key><string>${VERSION}</string>
