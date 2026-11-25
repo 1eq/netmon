@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/netmon-icon.png" alt="NetMon: a phosphor-green network radar on black glass" width="144" />
+</p>
+
 # NetMon
 
 A small native macOS menu bar app that monitors your internet connection.
@@ -13,6 +17,26 @@ A small native macOS menu bar app that monitors your internet connection.
 For how everything works in detail (measurement, diagnosis rules, alerts, data files, the API and the source layout), see **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)**. The same guide is in the app under **Guide**.
 
 No root, no dependencies. Probes use an unprivileged ICMP datagram socket, which macOS allows for normal users. It still receives the TTL-exceeded replies a hop trace needs.
+
+## Screenshots
+
+### Connection overview
+
+Live latency, packet loss, and recent connection events in one window.
+
+![NetMon Overview with latency charts, target statistics, and recent events](docs/assets/overview.png)
+
+### Hop-by-hop diagnosis
+
+Find where a problem carries forward through the route, with VPN context and harmless router anomalies called out separately.
+
+![NetMon Path with hop statistics, jitter diagnosis, and latency profile](docs/assets/path.png)
+
+### Throughput history
+
+Download, upload, responsiveness, and idle latency from macOS networkQuality.
+
+![NetMon Throughput with speed test results and history](docs/assets/throughput.png)
 
 ## Install
 
