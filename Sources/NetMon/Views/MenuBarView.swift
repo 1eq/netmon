@@ -18,6 +18,11 @@ struct MenuBarView: View {
                 TargetSummaryRow(monitor: m)
             }
 
+            if let link = model.wifi.link, link.connected, let ch = link.channel {
+                Divider()
+                WiFiSummaryRow(link: link, channel: ch, finding: model.wifi.worstFinding)
+            }
+
             Divider()
             ThroughputSummary()
             Divider()
@@ -100,6 +105,35 @@ struct Sparkline: View {
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+    }
+}
+
+private struct WiFiSummaryRow: View {
+    let link: WiFiLink
+    let channel: WiFiChannel
+    let finding: Finding?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: "wifi")
+                Text("Wi-Fi").bold()
+                Spacer()
+                Text("\(link.rssi) dBm").monospacedDigit()
+                    .foregroundStyle(link.rssi >= -67 ? .primary : link.rssi >= -75 ? Color.orange : .red)
+            }
+            HStack(spacing: 12) {
+                Metric("ch", "\(channel.number)")
+                Metric("band", channel.band.rawValue)
+                Metric("snr", "\(link.snr) dB")
+                Metric("rate", String(format: "%.0f", link.txRateMbps))
+            }
+            if let finding, finding.severity >= .warning {
+                Label(finding.title, systemImage: finding.severity == .critical ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(finding.severity == .critical ? .red : .orange)
+            }
+        }
     }
 }
 

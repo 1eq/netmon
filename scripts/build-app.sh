@@ -32,6 +32,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSUIElement</key><true/>
     <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
     <key>NSHighResolutionCapable</key><true/>
+    <!-- macOS reveals Wi-Fi network names, access point addresses and beacon data only to apps with Location permission. -->
+    <key>NSLocationUsageDescription</key><string>NetMon uses Location Services only so macOS will show Wi-Fi network names and access point details for the Wi-Fi analyzer. Your location is never stored or sent anywhere.</string>
+    <key>NSLocationWhenInUseUsageDescription</key><string>NetMon uses Location Services only so macOS will show Wi-Fi network names and access point details for the Wi-Fi analyzer. Your location is never stored or sent anywhere.</string>
 </dict>
 </plist>
 PLIST

@@ -171,8 +171,9 @@ final class TargetMonitor: Identifiable {
             tracer.maxHops = Prefs.maxHops
             if traceCycles % 15 == 0 { tunnelInterface = Resolver.tunnelInterface(toward: address) }
             let results = await PathTracer.probeCycle(address, limit: tracer.probeLimit)
-            // Hop stats gathered while a speed test fills the link would all look bad.
-            if !AppModel.shared.inSpeedTestQuietPeriod { applyTrace(results) }
+            // Hop stats gathered while a speed test fills the link, or a Wi-Fi scan takes the radio
+            // off-channel, would all look bad.
+            if !AppModel.shared.inMeasurementQuietPeriod { applyTrace(results) }
             let elapsed = Date().timeIntervalSince(started)
             try? await Task.sleep(for: .seconds(max(0.1, Prefs.traceInterval - elapsed)))
         }

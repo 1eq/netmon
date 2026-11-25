@@ -38,8 +38,9 @@ final class AlertManager: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func evaluate() {
-        // A running speed test saturates the link; anything measured now is self-inflicted.
-        guard !model.inSpeedTestQuietPeriod else { return }
+        // A running speed test saturates the link and a Wi-Fi scan takes the radio off-channel;
+        // anything measured now is self-inflicted.
+        guard !model.inMeasurementQuietPeriod else { return }
         let monitors = model.monitors
 
         // Whole connection down: every target fully unreachable.
@@ -86,18 +87,22 @@ final class AlertManager: NSObject, UNUserNotificationCenterDelegate {
         guard connectionDownSince == nil else { return }
         let now = Date()
         var current = Set<String>()
-        for m in monitors {
-            for f in m.findings where f.severity >= .warning {
-                let key = "\(m.host)|\(f.key)"
+        // Wi-Fi findings go through the same persist-for-a-minute and cooldown rules as path findings.
+        let sources: [(name: String, findings: [Finding])] = monitors.map { ($0.host, $0.findings) }
+            + [("Wi-Fi", model.wifi.findings)]
+        for source in sources {
+            for f in source.findings where f.severity >= .warning {
+                let key = "\(source.name)|\(f.key)"
                 current.insert(key)
                 let first = findingFirstSeen[key] ?? now
                 findingFirstSeen[key] = first
                 let cooled = findingNotified[key].map { now.timeIntervalSince($0) > Self.findingCooldown } ?? true
                 if now.timeIntervalSince(first) >= Self.findingPersistFor, cooled {
                     findingNotified[key] = now
-                    emit(f.severity == .critical ? .critical : .warning, "\(m.host): \(f.title)", f.detail,
+                    emit(f.severity == .critical ? .critical : .warning, "\(source.name): \(f.title)", f.detail,
                          notify: Prefs.notifyPathFindings)
-                    model.triggerSpeedTest(reason: "\(m.host): \(f.title.lowercased())")
+                    // A speed test can't tell us more about a weak signal or a crowded channel.
+                    if source.name != "Wi-Fi" { model.triggerSpeedTest(reason: "\(source.name): \(f.title.lowercased())") }
                 }
             }
         }
