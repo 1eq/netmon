@@ -25,7 +25,7 @@ Then watch the run under **Actions**. Notarization usually takes 1–5 minutes.
 The Developer ID certificate signs apps as the company. Anyone who can run a job with it can ship software that macOS trusts as ours, and if it leaks Apple revokes it, which breaks every app signed with it. So lock the environment down **before** adding any secret:
 
 1. **Create the environment.** In **Settings › Environments**, add one named `release`. Put all the secrets below there, never in repo-wide secrets.
-2. **Require reviewers.** Under **Required reviewers**, name one or two maintainers and turn on **Prevent self-review**. Every release run then waits for a second person's approval before it can read the secrets.
+2. **Require reviewers.** Under **Required reviewers**, name one or two maintainers and turn on **Prevent self-review**. Every release run then waits for a second person's approval before it can read the secrets. On the GitHub Team plan, required reviewers work only on public repos, so add them right after the repo goes public and before adding any secret. The approvers are brx-craig, corymvogt and brx-kari.
 3. **Restrict to release tags.** Under **Deployment branches and tags**, choose **Selected branches and tags** and add only the tag rule `v*`. A workflow on a branch, including an edited one, can't use the environment.
 4. **Protect the tags.** In **Settings › Rules › Rulesets**, add a tag ruleset for `v*` that restricts creation, update and deletion to the maintainers.
 5. **Keep write access small.** Contributors work from forks; workflows from fork pull requests never get secrets.
