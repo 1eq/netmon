@@ -87,6 +87,9 @@ struct StatusDTO: Encodable {
     let ipv6Available: Bool
     let speedTestRunning: Bool
     let alertsPausedForSpeedTest: Bool
+    /// A Wi-Fi scan takes the radio off-channel for seconds; latency spikes then are self-inflicted.
+    let alertsPausedForWiFiScan: Bool
+    let wifi: WiFiSummaryDTO?
     let targets: [TargetStatusDTO]
     let lastSpeedTest: ThroughputResult?
     let recentEvents: [NetEvent]
@@ -134,6 +137,85 @@ struct TraceDTO: Encodable {
     let speedTestWasRunning: Bool
     let findings: [FindingDTO]
     let hops: [HopDTO]
+}
+
+struct WiFiLinkDTO: Encodable {
+    let interfaceName: String
+    let poweredOn: Bool
+    let connected: Bool
+    /// Whether internet traffic currently uses Wi-Fi (false when Ethernet is primary).
+    let carriesTraffic: Bool
+    let ssid: String?
+    let bssid: String?
+    let rssiDbm: Int
+    let noiseDbm: Int
+    let snrDb: Int
+    let signalQuality: String
+    let txRateMbps: Double
+    let channel: WiFiChannel?
+    let channelIsDFS: Bool
+    let phyMode: String
+    let security: String
+    let transmitPowerMw: Int
+    let countryCode: String?
+
+    init(_ l: WiFiLink) {
+        interfaceName = l.interfaceName; poweredOn = l.poweredOn; connected = l.connected; carriesTraffic = l.carriesTraffic
+        ssid = l.ssid; bssid = l.bssid; rssiDbm = l.rssi; noiseDbm = l.noise; snrDb = l.snr
+        signalQuality = WiFiAnalysis.signalQuality(l.rssi)
+        txRateMbps = l.txRateMbps; channel = l.channel; channelIsDFS = l.channel?.isDFS ?? false
+        phyMode = l.phyMode; security = l.security; transmitPowerMw = l.transmitPowerMw; countryCode = l.countryCode
+    }
+}
+
+struct WiFiSummaryDTO: Encodable {
+    let connected: Bool
+    let carriesTraffic: Bool
+    let rssiDbm: Int?
+    let snrDb: Int?
+    let txRateMbps: Double?
+    let channel: WiFiChannel?
+    let lastScan: Date?
+    let scanInProgress: Bool
+    let findings: [FindingDTO]
+}
+
+struct WiFiHistoryPointDTO: Encodable {
+    let t: Date
+    let rssiAvgDbm: Double?
+    let rssiMinDbm: Double?
+    let noiseAvgDbm: Double?
+    let txRateAvgMbps: Double?
+
+    init(_ p: WiFiMonitor.HistoryPoint) {
+        t = p.t; rssiAvgDbm = r1(p.rssiAvg); rssiMinDbm = r1(p.rssiMin); noiseAvgDbm = r1(p.noiseAvg); txRateAvgMbps = r1(p.txRateAvg)
+    }
+}
+
+struct WiFiDTO: Encodable {
+    let generatedAt: Date
+    let hasWiFi: Bool
+    /// Without Location Services permission, macOS hides ssid/bssid and beacon data (BSS Load).
+    let locationPermission: String
+    let link: WiFiLinkDTO?
+    let findings: [FindingDTO]
+    let recommendation: WiFiAnalysis.Recommendation?
+    let scanIntervalMinutes: Double
+    let scanInProgress: Bool
+    let scanError: String?
+    let lastScanAt: Date?
+    let lastScanDurationSeconds: Double?
+    /// Load per candidate channel on the current band; score ≈ number of strong competing APs.
+    let channels: [ChannelLoad]
+    let neighbors: [WiFiNetwork]
+    let roamsLastHour: [[String: String]]
+    let history: WiFiHistoryDTO
+}
+
+struct WiFiHistoryDTO: Encodable {
+    let range: String
+    let bucketSeconds: Int
+    let points: [WiFiHistoryPointDTO]
 }
 
 extension Health {
@@ -231,6 +313,17 @@ enum APIRoutes {
             guard model.showWindow(section) else { return .error(503, "window not ready yet; try again in a moment") }
             return .json(["opened": name])
 
+        case ("GET", "/wifi"), ("POST", "/wifi/scan"):
+            let range = TimeRange(rawValue: req.query["range"] ?? (body["range"] as? String) ?? "1h")
+            guard let range else { return .error(400, "range must be one of \(TimeRange.allCases.map(\.rawValue))") }
+            let points = Int(req.query["points"] ?? "") ?? (body["points"] as? Int) ?? 60
+            if req.method == "POST" {
+                guard model.wifi.link?.poweredOn == true else { return .error(409, "Wi-Fi is off or missing; nothing to scan") }
+                guard !model.speedTestRunning else { return .error(409, "a speed test is running; scan afterwards") }
+                _ = await model.wifi.runScan()
+            }
+            return .json(wifi(model, range: range, points: points))
+
         case ("GET", "/settings"):
             return .json(SettingsAPI.current())
 
@@ -264,6 +357,15 @@ enum APIRoutes {
             ipv6Available: model.ipv6Available,
             speedTestRunning: model.speedTestRunning,
             alertsPausedForSpeedTest: model.inSpeedTestQuietPeriod,
+            alertsPausedForWiFiScan: model.wifi.inScanQuietPeriod && !model.inSpeedTestQuietPeriod,
+            wifi: model.wifi.link.map { l in
+                WiFiSummaryDTO(connected: l.connected, carriesTraffic: l.carriesTraffic,
+                               rssiDbm: l.connected ? l.rssi : nil, snrDb: l.connected ? l.snr : nil,
+                               txRateMbps: l.connected ? l.txRateMbps : nil, channel: l.channel,
+                               lastScan: model.wifi.lastScan?.date, scanInProgress: model.wifi.scanning,
+                               findings: model.wifi.findings.filter { $0.severity >= .warning || $0.key == "wifi-healthy" }
+                                   .map(FindingDTO.init))
+            },
             targets: model.monitors.map { m in
                 TargetStatusDTO(host: m.host, ipVersion: m.family.label, twinOf: m.twinOf, address: m.address, health: m.health.apiName,
                                 tunnelInterface: m.tunnelInterface, hopCount: m.destinationTTL,
@@ -274,6 +376,21 @@ enum APIRoutes {
             lastSpeedTest: model.lastThroughput,
             recentEvents: Array(model.events.suffix(5).reversed()),
             thresholds: ["lossPercent": Prefs.lossAlertPercent, "latencyMs": Prefs.latencyAlertMs, "jitterMs": Prefs.jitterAlertMs])
+    }
+
+    static func wifi(_ model: AppModel, range: TimeRange, points: Int) -> WiFiDTO {
+        let w = model.wifi
+        let maxPoints = min(500, max(10, points))
+        let bucket = max(range.bucket, (range.seconds / Double(maxPoints)).rounded(.up))
+        return WiFiDTO(generatedAt: Date(), hasWiFi: w.hasInterface, locationPermission: w.locationStatus,
+                       link: w.link.map(WiFiLinkDTO.init), findings: w.findings.map(FindingDTO.init),
+                       recommendation: w.recommendation, scanIntervalMinutes: Prefs.wifiScanMinutes,
+                       scanInProgress: w.scanning, scanError: w.scanError,
+                       lastScanAt: w.lastScan?.date, lastScanDurationSeconds: w.lastScan?.durationSeconds,
+                       channels: w.channelLoads, neighbors: w.neighbors,
+                       roamsLastHour: w.roams.map { ["date": ISO8601DateFormatter().string(from: $0.date), "detail": $0.detail] },
+                       history: WiFiHistoryDTO(range: range.rawValue, bucketSeconds: Int(bucket),
+                                               points: w.history(range: range, bucket: bucket).map(WiFiHistoryPointDTO.init)))
     }
 
     private static func path(_ m: TargetMonitor, _ model: AppModel) -> PathDTO {
@@ -340,6 +457,7 @@ enum SettingsAPI {
         "speed_test_cooldown_minutes": (Prefs.Key.speedTestCooldownMinutes, .double(15...1440)),
         "min_download_mbps": (Prefs.Key.minDownloadMbps, .double(0...10_000)),
         "history_days": (Prefs.Key.historyDays, .int(1...90)),
+        "wifi_scan_interval_minutes": (Prefs.Key.wifiScanMinutes, .double(0...240)),
     ]
 
     static var names: [String] { specs.keys.sorted() }

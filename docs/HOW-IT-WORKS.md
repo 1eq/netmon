@@ -15,6 +15,8 @@ This guide covers three things: what you see, how the measurements and diagnosis
 | Minute rollups | Saves each minute's latency summary to disk | Every minute |
 | Speed test | Runs macOS `networkQuality` | Only on demand or when an alert fires |
 | IPv6 check | Adds or removes IPv6 twins of your targets | Every 30 s |
+| Wi-Fi link | Signal, noise, link rate, channel, access point | Every 2 s |
+| Wi-Fi scan | Finds nearby access points and scores channel crowding | Every 10 min (setting), or on demand |
 | Local API | Serves live data to the CLI and Claude | Always on, loopback only |
 
 The defaults watch **1.1.1.1** (Cloudflare) and **8.8.8.8** (Google). They are fast, anycast, and almost always up. When both go bad at once, the problem is very likely yours or your ISP's, not theirs. Adding a target on a third network, such as 9.9.9.9 (Quad9) or 208.67.222.222 (Cisco OpenDNS), makes that call clearer: if all three degrade together, it's your side. While your Mac has IPv6, each target also gets an IPv6 twin; see [IPv6](#ipv6).
@@ -33,7 +35,7 @@ The menu bar item shows a coloured dot and the current latency, which is the low
 | Gray | Starting up (fewer than 5 samples yet) |
 | Blue | A speed test is running |
 
-Click it for a summary. For each target it shows avg latency, loss, jitter, hop count and a sparkline of the last two minutes. It also shows the last speed test, a **Speed test** button, and **Open NetMon** (⌘O) for the full window.
+Click it for a summary. For each target it shows avg latency, loss, jitter, hop count and a sparkline of the last two minutes. On Wi-Fi it shows signal, channel, band, SNR and link rate, plus the worst Wi-Fi finding. It also shows the last speed test, a **Speed test** button, and **Open NetMon** (⌘O) for the full window.
 
 ### Overview
 
@@ -67,6 +69,27 @@ The mtr-style view. Pick a target at the top. **Reset** clears the hop statistic
 
 At the default 2 s trace interval, the 100-probe window covers about the last 3½ minutes.
 
+### Wi-Fi
+
+A Wi-Fi analyzer for the link this Mac is on and the networks around it. See [Wi-Fi analysis](#wi-fi-analysis) for how the numbers are worked out.
+
+- **Cards:** signal (RSSI), signal-to-noise ratio with the noise floor, link rate, and channel with band, width and whether it is a DFS channel.
+- **Details:** network name, Wi-Fi standard, security, access point address, the access point's own load report if it sends one, and whether internet traffic actually uses Wi-Fi.
+- **Diagnosis:** Wi-Fi findings, most severe first.
+- **Signal and noise chart:** shaded green (good), orange (weak) and red (very weak). Dashed purple lines mark roams and channel changes. Below it, link rate over time. Pick 15m, 1h, 24h or 7d.
+- **Channel map:** every access point from the last scan, one band at a time. A block's width is its channel width and its height is its signal here; yours is highlighted. Overlapping blocks share airtime.
+- **Channel load:** a score for each channel your router could use on this band and width, with a suggestion when one is clearly quieter.
+- **Nearby access points:** the full scan, strongest first, with channel, signal, load (when broadcast), Wi-Fi standard and security.
+
+**Scan now** runs a scan straight away. macOS shows network names, access point addresses and load reports only to apps with Location Services permission. Without it the screen says so and everything else still works.
+
+| Signal (RSSI) | Meaning |
+|---|---|
+| −60 dBm or better | Excellent |
+| −60 to −67 dBm | Good; fine for calls and video |
+| −67 to −75 dBm | Weak; calls and games start to suffer |
+| Below −75 dBm | Very weak; slow rates and packet loss |
+
 ### Throughput
 
 Speed test history: download and upload in Mbps over time, and a table of every run.
@@ -99,6 +122,7 @@ A persistent log, newest first: connection down/restored, degraded/recovered tar
 | Alert when download below | 0 (off) | Mbps |
 | Launch at login | Off | |
 | Keep history for | 7 days | 1–90 days |
+| Wi-Fi neighbor scans every | 10 min | 0–240 min; 0 means only when you click Scan |
 
 Settings take effect immediately; nothing needs a restart. **Show data folder in Finder** opens the folder described in [Data on disk](#data-on-disk).
 
@@ -180,6 +204,42 @@ Every 15 traces, NetMon checks which network interface carries traffic to each t
 
 Through a tunnel, the hops between you and the VPN server are invisible; they are inside the encrypted tunnel. The first visible hop is usually the VPN server's side, and its latency includes your Wi-Fi, your ISP and the tunnel. NetMon adjusts its diagnosis for this; see below.
 
+### Wi-Fi analysis
+
+NetMon reads Wi-Fi through Apple's CoreWLAN framework. It needs no admin rights.
+
+**The link, every 2 s.** Signal (RSSI), noise floor, link rate, channel, band, width, Wi-Fi standard, security and transmit power. Reading these doesn't disturb the connection. NetMon keeps an hour of samples in memory and saves a per-minute summary to `wifi.jsonl`. A change of access point or channel is logged as a roam. NetMon also checks which interface carries internet traffic: when Ethernet does, Wi-Fi findings say so and are never blamed for latency.
+
+**Scans, every 10 minutes.** A scan lists every access point in range with its channel, width and signal. Scans are costly: the radio leaves your channel to listen on every other one, which takes 5–30 s (6 GHz and DFS channels are scanned passively) and causes latency spikes meanwhile. So scans are infrequent, skipped during speed tests, and followed by the same pause as a speed test: **no alerts and no hop statistics during a scan and for 60 s after.**
+
+**Channel load.** For each channel, NetMon adds up the other access points whose frequency range overlaps it. Each one counts from 0 (at −90 dBm, barely audible) to 1 (at −50 dBm or stronger). One whose primary channel differs but overlaps counts 1.3×, because radios that can't decode each other's frames collide instead of taking turns. An access point that reports its own utilization counts more when busy. Your own network is left out: your access point, other access points with the same network name (mesh nodes and other bands, which move channel with your router), and extra networks on the same radio, such as a guest network. Those share a radio and differ only in the access point address's locally-administered bit or last byte. A neighbor's radio that broadcasts several networks counts once. The score is roughly "how many strong networks you share airtime with". 3 or more is crowded; 5 or more is a warning.
+
+**Recommendation.** NetMon suggests another channel on the same band and width only when yours scores at least 1 and the other scores at least 1 lower. Non-DFS channels are preferred when they're nearly as quiet, because DFS channels must go quiet for a while if the router detects radar. Only the router can change its channel.
+
+**Access point load (BSS Load).** Many business-grade and some home access points broadcast how many devices are connected and what share of time the channel is busy. NetMon reads it from the beacon data when it's there. macOS hides beacon data without Location permission.
+
+**Location permission.** Since macOS 14.4, an app sees network names, access point addresses and beacon data only with Location Services permission. NetMon asks once. It never reads or stores your location. Signal, noise, channel, scanning and congestion work without permission. Because the app is ad-hoc signed, macOS may ask again after a rebuild.
+
+**What macOS doesn't expose:** true airtime use and retry counts (those need monitor mode or the router's own tools), MCS index, and interference from things that aren't Wi-Fi. That last one shows up only indirectly, as a higher noise floor.
+
+| Wi-Fi finding | Severity | Rule |
+|---|---|---|
+| Weak / very weak signal | Warning / critical | RSSI below −67 / −75 dBm |
+| Low / very low signal-to-noise | Warning / critical | SNR below 25 / 15 dB |
+| High noise floor | Warning | Noise above −75 dBm: likely non-Wi-Fi interference |
+| Low link rate | Warning | Under 30 Mbps |
+| On 2.4 GHz | Info, or warning if the same network name is seen on 5/6 GHz | |
+| 2.4 GHz channel overlaps its neighbors | Info | Not channel 1, 6 or 11 |
+| Frequent roaming | Warning | 4 or more access point or channel changes in 10 minutes |
+| Access point channel busy | Warning | Your access point reports 70% or more utilization |
+| Crowded channel | Info at score 3, warning at 5 | See channel load above |
+| Wi-Fi is the likely cause of first-hop delay | Critical | Hop 1 averages 20 ms or more, jitter 15 ms or more, or loss 5% or more, **and** a Wi-Fi warning is active |
+| Router slow to answer, but Wi-Fi looks fine | Warning | Hop 1 is slow as above with no Wi-Fi warning: points at the router or bufferbloat |
+| Network names hidden | Info | No Location permission |
+| Wi-Fi link looks good | OK | No warning or critical finding |
+
+The two first-hop findings tie Wi-Fi to the latency NetMon already measures. Hop 1 is your Wi-Fi link plus the router, so a slow hop 1 with a weak or crowded link points at Wi-Fi. A slow hop 1 with a clean link points at the router. Targets reached through a VPN are skipped, since their first hop is inside the tunnel.
+
 ## How bad hops are identified
 
 ### The carry-forward rule
@@ -231,6 +291,7 @@ Every 10 seconds NetMon checks the following. Each alert is edge-triggered: it f
 - **Connection down:** every target has sent at least 5 probes in the last 20 s and none were answered. It recovers when any target answers again, and the recovery says how long it was down.
 - **Degraded connection to a target:** over the last 60 s (at least 20 probes), loss, average latency or jitter is at or over its threshold. It includes the likely cause if a path finding is at warning or above. To avoid flapping, it recovers only once all three are comfortably below threshold: loss under half the threshold, latency and jitter under 80% of theirs.
 - **Path findings:** a warning or critical finding that has persisted for 60 s. The same finding repeats at most every 30 minutes.
+- **Wi-Fi findings:** the same rule as path findings, under the "Wi-Fi" name. Unlike path findings, they don't trigger a speed test. Wi-Fi disconnects, reconnects and roams are logged as events.
 - **Slow download:** a speed test came in under your minimum download setting.
 
 While the connection is down, degradation and path alerts are held back; one "down" alert says it all. Everything is written to the Events log. Notifications are sent only when they are switched on, and critical ones play a sound.
@@ -255,6 +316,7 @@ Everything lives in `~/Library/Application Support/NetMon/`:
 | `rollups.jsonl` | One line per target per minute: sent, received, avg, min, max, jitter |
 | `throughput.jsonl` | One line per speed test |
 | `events.jsonl` | One line per event |
+| `wifi.jsonl` | One line per minute on Wi-Fi: average and minimum signal, noise, average and minimum link rate, channel, access point |
 | `api.json` | Port, token and process id of the running app's API (mode 0600) |
 
 The `.jsonl` files are JSON Lines, with dates as Unix seconds. They are loaded at launch and trimmed to the history window. Speed tests are kept 23 days beyond the history window (30 days at the default), so the Throughput screen has more history. Raw per-second samples and hop windows are kept in memory only.
@@ -290,12 +352,13 @@ When Claude connects, the server sends it instructions on reading the data: the 
 | `netmon_status` | `netmon status` | Yes | Health, 60 s and 5 min stats, important findings, VPN, last speed test, recent events, thresholds, whether IPv6 is available. Each target says its `ipVersion`; twins say which target they mirror (`twinOf`). The starting point |
 | `netmon_path` | `netmon path [target]` | Yes | The hop table and findings |
 | `netmon_history` | `netmon history [target] [15m\|1h\|24h\|7d] [points]` | Yes | A summary for the range, the worst periods (3 worst buckets each by average latency, loss and spike, with times), and up to 60 trend buckets (`points` changes it) |
+| `netmon_wifi` | `netmon wifi [--scan] [range] [points]` | Yes | Wi-Fi link, findings, neighbors, channel load scores, recommendation, roams and signal history. `scan` forces a fresh scan (5–30 s). `/status` also carries a short Wi-Fi summary |
 | `netmon_events` | `netmon events [limit]` | Yes | Event log, newest first; MCP can also filter by minutes |
 | `netmon_throughput_history` | `netmon throughput [limit]` | Yes | Past speed tests |
 | `netmon_trace` | `netmon trace <host> [cycles]` | Yes | One-off trace and diagnosis to any host |
 | `netmon_run_speed_test` | `netmon speedtest [--no-wait]` | No | Runs a speed test; waits for the result by default |
 | `netmon_reset_path` | `netmon reset [target]` | No | Clears hop stats and rediscovers routes |
-| `netmon_open_window` | `netmon open [section]` | No | Opens the window on overview, path, throughput, events, settings or guide |
+| `netmon_open_window` | `netmon open [section]` | No | Opens the window on overview, path, wi-fi, throughput, events, settings or guide |
 | `netmon_get_settings` | `netmon settings` | Yes | All settings |
 | `netmon_update_settings` | `netmon set key=value …` | No | Changes settings |
 
@@ -303,7 +366,7 @@ The tool definitions live in one place, `Sources/NetMon/API/Tools.swift`, which 
 
 **One-off traces** use the same tracer and diagnosis as the monitors, with a fresh hop table. They use IPv4 unless the host is an IPv6 address or has no IPv4 address. Each round is about 1 s, or about 2 s when some hops never answer (they wait out the timeout). The default 15 rounds takes 15–30 s; the maximum is 60.
 
-**Settings** use these names over the API: `targets`, `ping_interval_seconds`, `trace_interval_seconds`, `max_hops`, `loss_alert_percent`, `latency_alert_ms`, `jitter_alert_ms`, `notifications_enabled`, `notify_path_findings`, `auto_speed_test`, `speed_test_cooldown_minutes`, `min_download_mbps`, `history_days`. Every value is range-checked before anything is written, so one bad value changes nothing. In the CLI, `targets=1.1.1.1,9.9.9.9` sets a list, and `true`, `false` and numbers are typed automatically.
+**Settings** use these names over the API: `targets`, `ping_interval_seconds`, `trace_interval_seconds`, `max_hops`, `loss_alert_percent`, `latency_alert_ms`, `jitter_alert_ms`, `notifications_enabled`, `notify_path_findings`, `auto_speed_test`, `speed_test_cooldown_minutes`, `min_download_mbps`, `history_days`, `wifi_scan_interval_minutes`. Every value is range-checked before anything is written, so one bad value changes nothing. In the CLI, `targets=1.1.1.1,9.9.9.9` sets a list, and `true`, `false` and numbers are typed automatically.
 
 ### HTTP API
 
@@ -316,6 +379,8 @@ All requests need `Authorization: Bearer <token>`, using the token from `api.jso
 | `GET /history` | `target`, `range`, `points` |
 | `GET /events` | `limit`, `since_minutes` |
 | `GET /throughput` | `limit` |
+| `GET /wifi` | `range`, `points` |
+| `POST /wifi/scan` | `{"range": "1h", "points": 60}`; scans, then returns the same as `GET /wifi` |
 | `GET /settings` | |
 | `POST /speedtest` | `{"wait": true}` |
 | `POST /trace` | `{"host": "…", "cycles": 15, "max_hops": 30}` |
@@ -359,10 +424,12 @@ The install script quits the running app, copies the bundle to `/Applications` (
 | `Monitoring/PathDiagnosis.swift` | The findings rules |
 | `Monitoring/Stats.swift` | Statistics, rollups and chart bucketing |
 | `Monitoring/Throughput.swift` | `networkQuality` runner |
+| `Monitoring/WiFiModels.swift` | Wi-Fi types, channel math, BSS Load parsing, channel load, recommendation and Wi-Fi findings (no CoreWLAN, so testable) |
+| `Monitoring/WiFiMonitor.swift` | CoreWLAN reads and scans, Location permission, link sampling, roams and per-minute Wi-Fi history |
 | `Monitoring/HistoryStore.swift` | JSON Lines storage |
 | `API/` | Loopback HTTP server, routes, client, tool definitions, MCP server, CLI |
 | `Views/` | SwiftUI screens |
-| `Tests/NetMonTests/` | Diagnosis, tracer, statistics, IPv6 parsing and guide tests |
+| `Tests/NetMonTests/` | Diagnosis, tracer, statistics, IPv6 parsing, Wi-Fi and guide tests |
 
 ### Concurrency
 

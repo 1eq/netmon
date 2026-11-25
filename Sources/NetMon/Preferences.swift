@@ -21,12 +21,14 @@ enum Prefs {
         static let speedTestCooldownMinutes = "speedTestCooldownMinutes"
         static let minDownloadMbps = "minDownloadMbps"
         static let historyDays = "historyDays"
+        static let wifiScanMinutes = "wifiScanMinutes"
     }
 
     /// Every settings key, for migration.
     static let allKeys = [Key.targets, Key.pingInterval, Key.traceInterval, Key.maxHops, Key.lossAlertPercent,
                           Key.latencyAlertMs, Key.jitterAlertMs, Key.notificationsEnabled, Key.notifyPathFindings,
-                          Key.autoSpeedTest, Key.speedTestCooldownMinutes, Key.minDownloadMbps, Key.historyDays]
+                          Key.autoSpeedTest, Key.speedTestCooldownMinutes, Key.minDownloadMbps, Key.historyDays,
+                          Key.wifiScanMinutes]
 
     /// Copies settings saved under the legacy bundle id (`old`) into `defaults`, whose
     /// saved values live in `domain`, once, without overwriting anything already saved.
@@ -63,6 +65,8 @@ enum Prefs {
             Key.speedTestCooldownMinutes: 60.0,
             Key.minDownloadMbps: 0.0,         // 0 = no throughput alert
             Key.historyDays: 7,
+            // A scan takes the radio off-channel for several seconds (up to ~30 s), so keep it rare.
+            Key.wifiScanMinutes: 10.0,        // 0 = only on demand
         ])
     }
 
@@ -86,4 +90,5 @@ enum Prefs {
     static var speedTestCooldownMinutes: Double { max(5, d.double(forKey: Key.speedTestCooldownMinutes)) }
     static var minDownloadMbps: Double { d.double(forKey: Key.minDownloadMbps) }
     static var historyDays: Int { max(1, d.integer(forKey: Key.historyDays)) }
+    static var wifiScanMinutes: Double { max(0, d.double(forKey: Key.wifiScanMinutes)) }
 }

@@ -21,7 +21,7 @@ enum Tools {
 
     static let all: [Tool] = [
         Tool(name: "netmon_status", cliName: "status",
-             description: "Current connection health. For each monitored target (default 1.1.1.1 and 8.8.8.8): health (ok/degraded/down/unknown), latency, loss and jitter over the last 60 s and 5 min, hop count, VPN tunnel if any, and the important path findings. While the Mac has IPv6, each target also has an IPv6 twin (ipVersion \"IPv6\", twinOf naming the IPv4 target); compare the two to tell an IPv6-only problem from a general one. Also returns the last speed test, the 5 most recent events and the alert thresholds. Start here.",
+             description: "Current connection health, plus a Wi-Fi summary (signal, SNR, link rate, channel, Wi-Fi findings; netmon_wifi has the detail). For each monitored target (default 1.1.1.1 and 8.8.8.8): health (ok/degraded/down/unknown), latency, loss and jitter over the last 60 s and 5 min, hop count, VPN tunnel if any, and the important path findings. While the Mac has IPv6, each target also has an IPv6 twin (ipVersion \"IPv6\", twinOf naming the IPv4 target); compare the two to tell an IPv6-only problem from a general one. Also returns the last speed test, the 5 most recent events and the alert thresholds. Start here.",
              properties: [:], required: [], readOnly: true,
              run: { _ in try await APIClient.get("/status") }),
 
@@ -49,6 +49,21 @@ enum Tools {
              ],
              required: [], readOnly: true,
              run: { args in try await APIClient.get("/events", query: stringArgs(args, ["limit", "since_minutes"])) }),
+
+        Tool(name: "netmon_wifi", cliName: "wifi",
+             description: "In-depth Wi-Fi: the current link (signal RSSI, noise, SNR, link rate, channel/band/width, DFS, PHY mode, security, whether internet traffic actually uses Wi-Fi), findings (weak signal, low SNR, high noise floor, 2.4 GHz, crowded channel, busy access point, frequent roaming, and whether Wi-Fi explains first-hop latency), the neighbor networks from the last scan with channel and signal, per-channel load scores for the current band (score ≈ number of strong competing access points; adjacent-channel overlap counts extra), a channel recommendation if one is clearly quieter, roams in the last hour, and signal/noise/link-rate history. Rules of thumb: RSSI ≥ -60 dBm excellent, -67 good, -75 weak; SNR ≥ 25 dB good. BSS Load (stations, channel utilization %) appears only for access points that broadcast it. Network names, AP addresses and BSS Load need Location Services permission (locationPermission). Scans run every few minutes; scan=true forces one, which takes 5-30 s and briefly disrupts the connection, so use it only when fresh neighbor data matters.",
+             properties: [
+                 "scan": ["type": "boolean", "description": "Run a fresh neighbor scan first (default false; takes 5-30 s)."],
+                 "range": ["type": "string", "enum": rangeValues, "description": "History window (default 1h)."],
+                 "points": ["type": "integer", "description": "Max history buckets (10-500, default 60)."],
+             ],
+             required: [], readOnly: true,
+             run: { args in
+                 if args["scan"] as? Bool == true {
+                     return try await APIClient.post("/wifi/scan", body: args.filter { $0.key != "scan" }, timeout: 90)
+                 }
+                 return try await APIClient.get("/wifi", query: stringArgs(args, ["range", "points"]))
+             }),
 
         Tool(name: "netmon_throughput_history", cliName: "throughput",
              description: "Past speed test results, newest first: download/upload Mbps, responsiveness in RPM (round-trips per minute under load; <300 low, 300-1000 medium, >1000 high), idle RTT, interface and MB used.",
@@ -106,6 +121,7 @@ enum Tools {
                  "speed_test_cooldown_minutes": ["type": "number", "description": "15-1440"],
                  "min_download_mbps": ["type": "number", "description": "Alert below this; 0 = off."],
                  "history_days": ["type": "integer", "description": "1-90"],
+                 "wifi_scan_interval_minutes": ["type": "number", "description": "0-240; 0 = scan only on demand."],
              ],
              required: [], readOnly: false,
              run: { args in try await APIClient.post("/settings", body: args) }),

@@ -17,6 +17,10 @@ enum MCPServer {
     tunnelInterface is set, traffic goes through a VPN: the hops are inside the tunnel and the first \
     visible hop includes the whole tunnel's latency. Compare targets: a problem on all of them that \
     starts at the same early hop is local or the ISP; a problem on one is that provider's.
+    When hop 1 is slow or the Mac is on Wi-Fi, use netmon_wifi: it shows signal, SNR, link rate, \
+    channel crowding, roaming and whether Wi-Fi explains the first-hop delay. Check carriesTraffic: \
+    if false, the Mac is on Ethernet and Wi-Fi findings don't matter. alertsPausedForWiFiScan means \
+    a neighbor scan just ran, which itself causes brief latency spikes.
     netmon_run_speed_test uses hundreds of MB and saturates the link. Run it only when bandwidth is \
     actually in question.
     """

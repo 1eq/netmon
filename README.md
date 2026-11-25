@@ -5,6 +5,7 @@ A small native macOS menu bar app that monitors your internet connection.
 - **Latency** to 1.1.1.1 and 8.8.8.8 (configurable), pinged once a second: last, avg, min, max, loss, jitter.
 - **IPv6**: while your Mac has IPv6, every target gets an IPv6 twin on the same network, so IPv6-only problems show up.
 - **mtr-style path analysis**: every hop is probed continuously and kept as a rolling window of 100 probes. The app then works out which hop is actually at fault (see below).
+- **Wi-Fi analyzer**: signal, noise, SNR, link rate, channel/band/width and roaming every 2 s; periodic scans of nearby access points with a channel map, per-channel load scores, access point load (BSS Load) when broadcast, and a channel suggestion. It also tells you whether Wi-Fi explains a slow first hop.
 - **Throughput** via macOS's built-in `networkQuality`: download, upload, responsiveness (RPM) and idle RTT.
 - **History & charts**: 15m / 1h from raw samples, 24h / 7d from per-minute rollups kept on disk.
 - **Notifications** for connection down/restored, sustained loss, latency or jitter, bad hops, and slow downloads.
@@ -24,9 +25,15 @@ Requires macOS 15+ and Xcode (or the Command Line Tools) with Swift 6.
 ./scripts/build-app.sh --install  # also copies to /Applications and launches it
 ```
 
-It runs as a menu bar item showing a coloured dot (green/orange/red, blue during a speed test) and the current latency. Click it for a summary. **Open NetMon** opens the full window (Overview, Path, Throughput, Events, Settings, Guide). To start it automatically, turn on **Launch at login** in Settings.
+It runs as a menu bar item showing a coloured dot (green/orange/red, blue during a speed test) and the current latency. Click it for a summary. **Open NetMon** opens the full window (Overview, Path, Wi-Fi, Throughput, Events, Settings, Guide). To start it automatically, turn on **Launch at login** in Settings.
 
 The first notification will ask for permission. If you miss it, allow NetMon in System Settings › Notifications.
+
+NetMon also asks for **Location Services** permission. macOS shows Wi-Fi network names, access point addresses and access point load only to apps with it. NetMon never reads or stores your location. Signal, channel and congestion data work without it. If you declined, turn it on in System Settings › Privacy & Security › Location Services.
+
+## Wi-Fi
+
+The Wi-Fi screen samples the link every 2 s and scans for nearby access points every 10 minutes (configurable; 0 means only on demand). A scan takes the radio off your channel for 5–30 s, so it's kept infrequent, and alerts and hop stats pause for a minute after each one, as they do after a speed test. Each channel your router could use gets a score: roughly how many strong networks share or overlap its airtime. NetMon suggests a channel when one is clearly quieter; only the router can change it. NetMon can't see true airtime use, retry counts or the MCS index, because macOS doesn't expose them without monitor mode. See [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md#wi-fi-analysis) for the rules.
 
 ## How bad hops are identified
 
@@ -70,12 +77,13 @@ claude mcp add --scope user netmon -- /Applications/NetMon.app/Contents/MacOS/Ne
 | `netmon_status` | `netmon status` | Health, 60 s / 5 min latency, loss and jitter, key findings, last speed test, recent events |
 | `netmon_path` | `netmon path [target]` | mtr-style hop table and diagnosis |
 | `netmon_history` | `netmon history [target] [15m\|1h\|24h\|7d]` | Bucketed latency and loss over time |
+| `netmon_wifi` | `netmon wifi [--scan] [range]` | Wi-Fi link, findings, neighbors, channel load, recommendation, signal history |
 | `netmon_events` | `netmon events [limit]` | Alerts, recoveries, speed tests |
 | `netmon_throughput_history` | `netmon throughput [limit]` | Past speed tests |
 | `netmon_run_speed_test` | `netmon speedtest [--no-wait]` | Runs networkQuality (heavy; see above) |
 | `netmon_trace` | `netmon trace <host> [cycles]` | One-off trace and diagnosis to any host |
 | `netmon_reset_path` | `netmon reset [target]` | Clears hop stats and rediscovers routes |
-| `netmon_open_window` | `netmon open [section]` | Opens the window on a section (overview, path, throughput, events, settings, guide) |
+| `netmon_open_window` | `netmon open [section]` | Opens the window on a section (overview, path, wi-fi, throughput, events, settings, guide) |
 | `netmon_get_settings` / `netmon_update_settings` | `netmon settings` / `netmon set k=v …` | Read or change settings (range-checked) |
 
 `scripts/build-app.sh --install` symlinks the CLI to `~/.local/bin/netmon`. Tool definitions live in one place (`Sources/NetMon/API/Tools.swift`), so MCP and the CLI stay in sync. The MCP server also sends Claude instructions on how to read hop data (the carry-forward rule, VPN caveats, and when a speed test is worth its cost).
@@ -84,7 +92,7 @@ claude mcp add --scope user netmon -- /Applications/NetMon.app/Contents/MacOS/Ne
 
 ## Data
 
-`~/Library/Application Support/NetMon/` holds JSON Lines files: `rollups.jsonl` (per-minute latency per target), `throughput.jsonl`, `events.jsonl`. They're pruned to the history window in Settings (default 7 days).
+`~/Library/Application Support/NetMon/` holds JSON Lines files: `rollups.jsonl` (per-minute latency per target), `wifi.jsonl` (per-minute Wi-Fi signal, noise, link rate, channel), `throughput.jsonl`, `events.jsonl`. They're pruned to the history window in Settings (default 7 days).
 
 ## Development
 

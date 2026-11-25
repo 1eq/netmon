@@ -44,6 +44,8 @@ final class AppModel {
     @ObservationIgnored var openMainWindow: (() -> Void)?
 
     @ObservationIgnored let store = HistoryStore()
+    /// Wi-Fi link, neighbor scans and channel analysis. Observable on its own.
+    @ObservationIgnored private(set) lazy var wifi = WiFiMonitor(model: self)
     @ObservationIgnored private lazy var alerts = AlertManager(model: self)
     @ObservationIgnored private var started = false
     @ObservationIgnored private lazy var api = LocalAPIServer { request in
@@ -61,6 +63,7 @@ final class AppModel {
         throughputHistory = store.load(ThroughputResult.self, from: "throughput", keepingAfter: cutoff.addingTimeInterval(-23 * 86_400)) { $0.date }
         events = store.load(NetEvent.self, from: "events", keepingAfter: cutoff) { $0.date }
         applyTargets()
+        wifi.start(loadingAfter: cutoff)
         alerts.start()
         api.start()
         watchIPv6()
@@ -197,6 +200,8 @@ final class AppModel {
     var inSpeedTestQuietPeriod: Bool {
         speedTestRunning || speedTestEndedAt.map { Date().timeIntervalSince($0) < 60 } ?? false
     }
+    /// Speed test or Wi-Fi scan: either disturbs latency, so alerts and hop stats pause.
+    var inMeasurementQuietPeriod: Bool { inSpeedTestQuietPeriod || wifi.inScanQuietPeriod }
     @ObservationIgnored private var speedTestEndedAt: Date?
     @ObservationIgnored private var lastAutoSpeedTest: Date?
 

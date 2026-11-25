@@ -5,6 +5,7 @@ import Foundation
 ///     netmon status
 ///     netmon path [target]
 ///     netmon history [target] [range] [points]   range: 15m | 1h | 24h | 7d
+///     netmon wifi [--scan] [range] [points]
 ///     netmon events [limit]
 ///     netmon throughput [limit]
 ///     netmon speedtest [--no-wait]
@@ -62,6 +63,15 @@ enum CLI {
                 else { out["target"] = arg }
             }
             return out
+        case "wifi":
+            var out: [String: Any] = [:]
+            for arg in rest {
+                if arg == "--scan" { out["scan"] = true }
+                else if Tools.rangeValues.contains(arg) { out["range"] = arg }
+                else if let n = Int(arg) { out["points"] = n }
+                else { throw APIClient.Failure(message: "usage: netmon wifi [--scan] [range] [points]") }
+            }
+            return out
         case "events", "throughput":
             return rest.first.flatMap(Int.init).map { ["limit": $0] } ?? [:]
         case "speedtest":
@@ -99,12 +109,13 @@ enum CLI {
           netmon status                      health, latency, loss, findings, last speed test
           netmon path [target]               mtr-style hop table + diagnosis
           netmon history [target] [range] [points]  range: \(Tools.rangeValues.joined(separator: " | "))
+          netmon wifi [--scan] [range] [points]  Wi-Fi link, neighbors, channel load, findings
           netmon events [limit]              alerts, recoveries, speed tests
           netmon throughput [limit]          speed test history
           netmon speedtest [--no-wait]       run networkQuality (uses hundreds of MB)
           netmon trace <host> [cycles]       one-off trace to any host
           netmon reset [target]              clear hop stats, rediscover route
-          netmon open [section]              show the window: overview | path | throughput | events | settings
+          netmon open [section]              show the window: overview | path | wi-fi | throughput | events | settings
           netmon settings                    show settings
           netmon set key=value ...           change settings (\(SettingsAPI.names.count) keys; see `netmon settings`)
 

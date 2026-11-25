@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.speedTestCooldownMinutes) private var cooldown = 60.0
     @AppStorage(Prefs.Key.minDownloadMbps) private var minDownload = 0.0
     @AppStorage(Prefs.Key.historyDays) private var historyDays = 7
+    @AppStorage(Prefs.Key.wifiScanMinutes) private var wifiScanMinutes = 10.0
 
     @State private var draftTargets = ""
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -69,6 +70,14 @@ struct SettingsView: View {
                     Text(minDownload == 0 ? "Slow-download alert: off" : "Alert if download < \(Int(minDownload)) Mbps")
                 }
                 Text("Speed tests never run on a timer. Each one can move hundreds of MB or more.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section("Wi-Fi") {
+                Stepper(value: $wifiScanMinutes, in: 0...240, step: 5) {
+                    Text(wifiScanMinutes == 0 ? "Neighbor scans: only when you click Scan" : "Scan for neighbor networks every \(Int(wifiScanMinutes)) min")
+                }
+                Text("Each scan takes the radio off your channel for 5–30 s, causing brief latency spikes; alerts pause for a minute afterwards. Signal and link rate are sampled every 2 s regardless.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
