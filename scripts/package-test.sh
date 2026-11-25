@@ -22,7 +22,7 @@ chmod +x "$STAGE/install.sh"
 (cd "$DIST" && ditto -c -k --keepParent "NetMon-$VERSION" "NetMon-$VERSION.zip")
 rm -rf "$STAGE"
 
-zip -qr "$DIST/netmon-source-$VERSION.zip" Package.swift README.md .gitignore Sources Tests scripts docs \
+zip -qr "$DIST/netmon-source-$VERSION.zip" Package.swift README.md LICENSE .gitignore Sources Tests scripts docs \
   -x '*.DS_Store'
 
 echo

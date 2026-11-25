@@ -78,14 +78,14 @@ Start a **new** Claude Code session, then try asking things like:
 - **Wi-Fi vs wired, and VPN on vs off.** Does the diagnosis blame the right thing? Through a VPN it should say it's measuring through a tunnel.
 - **Speed test.** Click it once to try it. Each run moves hundreds of MB, so mind metered connections. It also runs automatically when an alert fires, at most once an hour; you can turn that off in Settings.
 - **Sleep and wake, switching networks.** NetMon should recover by itself. **Reset** on the Path screen clears stale hop data.
-- **IPv6.** If your network has IPv6, each target gets an IPv6 twin, marked with an IPv6 badge. Most networks here don't have it, in which case you won't see any twins.
+- **IPv6.** If your network has IPv6, each target gets an IPv6 twin, marked with an IPv6 badge. Many networks don't have it, in which case you won't see any twins.
 
 ## Reporting problems
 
 Please include:
 
 - What you saw and what you expected.
-- The output of `netmon status`, and `netmon path` if it's about the diagnosis. It contains public router addresses and your latency numbers; nothing personal.
+- The output of `netmon status`, and `netmon path` if it's about the diagnosis. It contains public router addresses and your latency numbers. `netmon wifi` output contains Wi-Fi network names and access point addresses, which can reveal where you are; remove them before sharing.
 - Whether you were on a VPN, Wi-Fi or wired.
 - If the app froze: in Terminal, run `sample NetMon 5 -file ~/Desktop/netmon-sample.txt` while it's frozen, and send that file.
 
