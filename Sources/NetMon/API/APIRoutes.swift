@@ -83,6 +83,8 @@ struct TargetStatusDTO: Encodable {
 
 struct StatusDTO: Encodable {
     let generatedAt: Date
+    /// App version, for bug reports. "dev" when run outside the bundle (swift run).
+    let version: String
     let overallHealth: String
     let ipv6Available: Bool
     let speedTestRunning: Bool
@@ -353,6 +355,7 @@ enum APIRoutes {
     static func status(_ model: AppModel) -> StatusDTO {
         StatusDTO(
             generatedAt: Date(),
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev",
             overallHealth: model.overallHealth.apiName,
             ipv6Available: model.ipv6Available,
             speedTestRunning: model.speedTestRunning,

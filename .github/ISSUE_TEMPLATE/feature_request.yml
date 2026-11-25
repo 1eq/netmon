@@ -1,0 +1,19 @@
+name: Feature request
+description: An idea for something NetMon should measure, show or diagnose.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: The situation you were in and what you couldn't tell or do.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like NetMon to do?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you tried instead?
